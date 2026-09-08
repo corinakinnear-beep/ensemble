@@ -65,7 +65,7 @@
   .help li strong{display:block;font-weight:600}
   .help li span{color:var(--ink-2)}
   .help .foot{margin:clamp(10px,1.6vw,16px) 0 0;padding-top:clamp(10px,1.4vw,14px);border-top:1px solid var(--line);font-size:var(--fs-cap);color:var(--ink-2)}
-  .help kbd{display:inline-block;border:1px solid var(--line);border-radius:6px;padding:1px 7px;font-size:var(--fs-cap);font-family:inherit;font-weight:600;color:var(--ink);background:var(--paper)}
+  kbd{display:inline-block;border:1px solid var(--line);border-radius:6px;padding:1px 7px;font-size:var(--fs-cap);font-family:inherit;font-weight:600;color:var(--ink);background:var(--paper)}
   @media (max-width:600px){.help .eyebrow{margin-bottom:2px}.help li{line-height:1.35}}
 
   /* top menu */
@@ -342,7 +342,7 @@
     <h1 id="dashHi">Your events</h1>
     <p class="lede">Everything you're hosting or have been invited to.</p>
     <div class="row" style="margin-bottom:26px">
-      <button class="btn" id="dashNew">Create an event</button>
+      <button class="btn" id="dashNew">Create new event</button>
       <button class="btn ghost" id="dashClearPast">Remove past events</button>
     </div>
     <div class="evlist" id="evlist"></div>
@@ -372,7 +372,7 @@
   <!-- ===== CREATE / EDIT ===== -->
   <section id="home" class="hidden">
     <div id="createIntro">
-      <h1>Find the time — and the place — where the most of you can actually play.</h1>
+      <h1>Find the time — and the place — where the most of you can meet.</h1>
       <p class="lede">Paint the times you're proposing at each location. Everyone marks when they can make it, and you'll see exactly who's free for each slot.</p>
     </div>
     <div id="editIntro" class="hidden">
@@ -794,9 +794,9 @@ const PIN_SUFFIX = '::ensemble-pin';
            <button class="menutrigger" id="menuBtn" aria-expanded="false"><span class="av">${esc(nm.trim().charAt(0).toUpperCase() || '?')}</span>Menu<span class="car">&#9662;</span></button>
            <div class="menupanel" id="menuPanel">
              <div class="mhead"><b>${esc(profileName || 'Signed in')}</b><span>${esc(user.user_metadata?.alert_email || 'No alert email set')}</span></div>
-             <button id="mDash">My dashboard</button>
+             <button id="mDash">My events</button>
              <button id="mAccount">Manage account</button>
-             <button id="mNew">Create an event</button>
+             <button id="mNew">Create new event</button>
              <button id="signout">Sign out</button>
            </div>
          </div>`
