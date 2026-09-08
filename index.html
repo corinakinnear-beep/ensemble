@@ -116,8 +116,8 @@
 
   /* steps inside a section */
   .steps{list-style:none;margin:0;padding:0;display:grid;gap:16px;grid-template-columns:repeat(auto-fit,minmax(280px,1fr))}
-  .steps li{display:grid;grid-template-columns:12px 1fr;gap:12px;align-items:start;line-height:1.5}
-  .steps li .num{width:7px;height:7px;border-radius:50%;background:var(--h3);margin-top:8px}
+  .steps li{display:grid;grid-template-columns:26px 1fr;gap:12px;align-items:start;line-height:1.5}
+  .steps li .ico{font-size:19px;line-height:1.25;text-align:center}
   .steps li strong{display:block;font-weight:600;margin-bottom:2px}
   .steps li span{color:var(--ink-2)}
   .stepfoot{margin:20px 0 0;padding-top:16px;border-top:1px solid var(--line);color:var(--ink-2);font-size:var(--fs-body)}
@@ -338,6 +338,7 @@
 
   <!-- ===== DASHBOARD ===== -->
   <section id="dash" class="hidden">
+    <div id="eventsBlock">
     <h1 id="dashHi">Your events</h1>
     <p class="lede">Everything you're hosting or have been invited to.</p>
     <div class="row" style="margin-bottom:26px">
@@ -345,11 +346,15 @@
       <button class="btn ghost" id="dashClearPast">Remove past events</button>
     </div>
     <div class="evlist" id="evlist"></div>
+    </div>
 
-    <h3 class="bigtitle hidden" id="acctTitle">Manage your account</h3>
+    <div id="acctBlock" class="hidden">
+    <h1 id="acctTitle">Manage your account</h1>
+    <p class="lede">Your sign-in details.</p>
+    <div class="btnrow" style="margin-bottom:26px"><button class="btn ghost" id="acctBack">&larr; Back to my events</button></div>
 
 
-    <section class="section hidden" id="acctSection">
+    <section class="section" id="acctSection">
       <div class="shead"><h3>Change your PIN</h3></div>
       <p class="cap">Signed in as <b id="acctName"></b>. Your PIN is how you get back in, so pick something you'll remember.</p>
       <div class="form" style="max-width:520px;margin:16px 0 0">
@@ -361,6 +366,7 @@
         <span class="savestate" id="pinState"></span>
       </div>
     </section>
+    </div>
   </section>
 
   <!-- ===== CREATE / EDIT ===== -->
@@ -391,10 +397,10 @@
     <h3 class="sec">Propose your times</h3>
     <div class="help">
       <h4>Marking times on the grid</h4>
-      <ol>
-        <li><span class="num"></span><div><strong>Drag across slots</strong><span>Click and drag to select a run of times. Click a selected slot again to remove it.</span></div></li>
-        <li><span class="num"></span><div><strong>Tap a day heading for the whole day</strong><span>The date label at the top of a column selects or clears that entire day at once.</span></div></li>
-        <li><span class="num"></span><div><strong>On a phone, use the bar at the bottom</strong><span><kbd>Scroll</kbd> taps one slot at a time and lets the page scroll. <kbd>Paint</kbd> drags across many slots and holds the page still.</span></div></li>
+      <ol class="steps">
+        <li><span class="ico">🖐️</span><div><strong>Drag across the times you'd offer</strong><span>Click again to remove one.</span></div></li>
+        <li><span class="ico">📅</span><div><strong>Tap a date to take the whole day</strong><span>Tap it again to clear it.</span></div></li>
+        <li><span class="ico">📱</span><div><strong>On a phone, use the bar at the bottom</strong><span><kbd>Scroll</kbd> taps one slot; <kbd>Paint</kbd> drags across many.</span></div></li>
       </ol>
     </div>
     <div class="row" style="margin-bottom:12px">
@@ -473,10 +479,10 @@
       <section class="section">
         <div class="shead"><h3>Mark the times you can make, then save</h3></div>
         <ol class="steps">
-          <li><span class="num"></span><div><strong>Start by choosing the location</strong><span>If this event offers more than one place, pick one below first, then mark your times for it. Answer each location separately.</span></div></li>
-          <li><span class="num"></span><div><strong>Drag across the slots that work for you</strong><span>Click a selected slot again to remove it. Hatched slots weren&rsquo;t offered for this event.</span></div></li>
-          <li><span class="num"></span><div><strong>Tap a day heading for the whole day</strong><span>The date label at the top of a column selects or clears that entire day at once.</span></div></li>
-          <li><span class="num"></span><div><strong>On a phone, use the bar at the bottom</strong><span><kbd>Scroll</kbd> taps one slot at a time and lets the page scroll. <kbd>Paint</kbd> drags across many slots and holds the page still.</span></div></li>
+          <li><span class="ico">📍</span><div><strong>Pick a location first</strong><span>Answer each place separately.</span></div></li>
+          <li><span class="ico">🖐️</span><div><strong>Drag across the times you can make</strong><span>Click again to remove. Hatched slots weren't offered.</span></div></li>
+          <li><span class="ico">📅</span><div><strong>Tap a date to take the whole day</strong><span>Tap it again to clear it.</span></div></li>
+          <li><span class="ico">📱</span><div><strong>On a phone, use the bar at the bottom</strong><span><kbd>Scroll</kbd> taps one slot; <kbd>Paint</kbd> drags across many.</span></div></li>
         </ol>
         <p class="stepfoot"><em>When you&rsquo;re done, press <b>Save changes</b> at the bottom of the page. You can sign back in with the same name and PIN, on any device, to change your answer any time.</em></p>
       </section>
@@ -491,9 +497,6 @@
         <div class="gridwrap" id="youGrid"></div>
         <div class="quickfill">
           <p class="qf-title">Quick fill options</p>
-          <div class="qf-row">
-            <button class="btn ghost small" id="mineAll">Select all proposed times</button>
-          </div>
           <div class="qf-row hidden" id="copyMineBlock">
             <button class="btn ghost small" id="copyMine">Copy my times to</button>
             <select id="copyMineTo"></select>
@@ -871,10 +874,9 @@ const PIN_SUFFIX = '::ensemble-pin';
   async function loadDash() {
     $('#dashHi').textContent = profileName ? `Welcome back, ${profileName}` : 'Your events';
     renderAccount();
-    $('#acctTitle').classList.toggle('hidden', !showAccount);
-    $('#acctSection').classList.toggle('hidden', !showAccount);
-    if (showAccount) setTimeout(() => $('#acctTitle').scrollIntoView({ behavior: 'smooth', block: 'start' }), 200);
-    showAccount = false;
+    $('#acctBlock').classList.toggle('hidden', !showAccount);
+    $('#eventsBlock').classList.toggle('hidden', showAccount);
+    window.scrollTo(0, 0);
     $('#evlist').innerHTML = '<p class="empty">Loading…</p>';
     const { data: mineR } = await sb.from('responses').select('event_id,updated_at,dismissed').eq('user_id', user.id);
     const ids = (mineR || []).filter(r => !r.dismissed).map(r => r.event_id);
@@ -946,6 +948,7 @@ const PIN_SUFFIX = '::ensemble-pin';
     toast('Past events removed'); loadDash();
   };
   $('#dashNew').onclick = () => { creating = true; render(); };
+  $('#acctBack').onclick = () => { showAccount = false; render(); };
 
   function renderAccount() {
     $('#acctName').textContent = profileName || 'you';
@@ -1175,7 +1178,6 @@ const PIN_SUFFIX = '::ensemble-pin';
     mine[o] = new Set([...mine[loc]].filter(i => locs()[o].proposed.includes(i)));
     markDirty(); toast(`Copied to ${locs()[o].name} — only times proposed there`);
   };
-  $('#mineAll').onclick = () => { mine[loc] = new Set(locs()[loc].proposed); paintSet($('#youGrid'), mine[loc]); markDirty(); };
   $('#clearMine').onclick = () => { mine[loc].clear(); paintSet($('#youGrid'), mine[loc]); markDirty(); };
   function renderNote(edit) {
     const has = !!(myNote && myNote.trim());
