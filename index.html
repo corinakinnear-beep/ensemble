@@ -199,6 +199,8 @@
   table.grid td.on{background:var(--you);box-shadow:none}
   .propose table.grid td.on{background:var(--propose);box-shadow:none}
   table.grid td.na{background:repeating-linear-gradient(135deg,transparent,transparent 4px,rgba(91,93,102,.11) 4px,rgba(91,93,102,.11) 5px);cursor:default;box-shadow:none;opacity:.65}
+  /* you marked this, but the organiser has since withdrawn it */
+  table.grid td.na.on{opacity:1;background:repeating-linear-gradient(135deg,var(--you),var(--you) 5px,#E0B53A 5px,#E0B53A 7px);box-shadow:inset 0 0 0 2px #C8991A}
   table.grid td.l1{background:var(--h1)} table.grid td.l2{background:var(--h2)}
   table.grid td.l3{background:var(--h3)} table.grid td.l4{background:var(--h4)}
   .heat table.grid td{cursor:default;text-align:center;font-size:var(--fs-cap);font-weight:600;color:var(--ink-2);line-height:var(--cell)}
@@ -497,6 +499,7 @@
           <div class="tabs loc" id="locTabs" role="tablist"></div>
         </div>
         <p class="legend" style="margin:0 0 14px"><i style="background:var(--you)"></i> = you can make it here. Hatched slots weren&rsquo;t proposed.</p>
+        <p class="cap hidden" id="withdrawnNote" style="margin:0 0 14px;padding:10px 12px;background:#FFF8E6;border:1px solid #F2DA96;border-radius:10px"></p>
         <div class="gridwrap" id="youGrid"></div>
         <div class="quickfill">
           <p class="qf-title">Quick fill options</p>
@@ -745,7 +748,15 @@ const PIN_SUFFIX = '::ensemble-pin';
     if (cfg.g < 1440) html += `<tr><th class="time">${fmtHour(cfg.e)}</th></tr>`;
     container.innerHTML = html + '</tbody></table>';
   }
-  const paintSet = (grid, set) => grid.querySelectorAll('td').forEach(td => td.classList.toggle('on', set.has(+td.dataset.i)));
+  const paintSet = (grid, set) => {
+    let withdrawn = 0;
+    grid.querySelectorAll('td').forEach(td => {
+      const on = set.has(+td.dataset.i);
+      td.classList.toggle('on', on);
+      if (on && td.classList.contains('na')) withdrawn++;
+    });
+    return withdrawn;
+  };
 
   let paintMode = !coarse;
   function makePainter(grid, getSet, canPaint) {
@@ -1222,7 +1233,16 @@ const PIN_SUFFIX = '::ensemble-pin';
     if (loc >= locs().length) loc = 0;
     const pset = new Set(locs()[loc].proposed || []);
     buildGrid($('#youGrid'), plan.config, pset); buildGrid($('#groupGrid'), plan.config, pset);
-    setPaintMode(paintMode); paintSet($('#youGrid'), mine[loc] ||= new Set()); paintHeat();
+    setPaintMode(paintMode);
+    const withdrawn = paintSet($('#youGrid'), mine[loc] ||= new Set());
+    const wn = $('#withdrawnNote');
+    if (wn) {
+      wn.classList.toggle('hidden', !withdrawn);
+      wn.innerHTML = withdrawn
+        ? `<b>${withdrawn} ${withdrawn === 1 ? 'time you marked is' : 'times you marked are'} no longer offered</b> — shown striped below. They won't count unless the organiser offers them again.`
+        : '';
+    }
+    paintHeat();
   }
   makePainter($('#youGrid'), () => mine[loc] ||= new Set(), () => { if (plan.closed) { toast('This event is closed to changes'); return false; } return true; });
   $('#youGrid').addEventListener('painted', markDirty);
