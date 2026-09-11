@@ -1239,7 +1239,7 @@ const PIN_SUFFIX = '::ensemble-pin';
     if (wn) {
       wn.classList.toggle('hidden', !withdrawn);
       wn.innerHTML = withdrawn
-        ? `<b>${withdrawn} ${withdrawn === 1 ? 'time you marked is' : 'times you marked are'} no longer offered</b> — shown striped below. They won't count unless the organiser offers them again.`
+        ? `<b>${withdrawn} ${withdrawn === 1 ? 'time you marked is' : 'times you marked are'} no longer offered by the organiser</b> — shown striped below.`
         : '';
     }
     paintHeat();
