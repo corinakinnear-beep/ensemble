@@ -863,7 +863,7 @@ const PIN_SUFFIX = '::ensemble-pin';
 
   /* ---------- routing ---------- */
   let eventId = null, plan = null, responses = [], channel = null;
-  let showAccount = false, justCreated = false, curTab = 'group', loc = 0, mine = {}, myNote = '', myNoteAt = null, dirty = false, editing = false, creating = false, isOwner = false;
+  let showAccount = false, justCreated = false, curTab = 'group', loc = 0, mine = {}, myAnchors = null, myNote = '', myNoteAt = null, dirty = false, editing = false, creating = false, isOwner = false;
   let selected = null; // Set of user_ids being viewed, null = everyone
   const stopPolling = () => { clearInterval(pollTimer); pollTimer = null; };
   const route = () => { const m = location.hash.match(/^#e\/([0-9a-f-]{36})/); eventId = m ? m[1] : null; };
@@ -1169,12 +1169,11 @@ const PIN_SUFFIX = '::ensemble-pin';
     responses = rs || [];
     const own = responses.find(r => r.user_id === user.id);
     mine = {};
-    const restored = own?.anchors ? fromAnchors(plan.config, own.anchors) : null;
+    myAnchors = (own?.anchors && Object.keys(own.anchors).length) ? own.anchors : null;
+    const restored = myAnchors ? fromAnchors(plan.config, myAnchors) : null;
     plan.config.locations.forEach((_, i) => {
-      // prefer the real-time record; fall back to stored positions for older answers
-      const fromReal = restored ? (restored[i] || []) : null;
-      const fromPos = own?.availability?.[i] || [];
-      mine[i] = new Set(fromReal && fromReal.length >= fromPos.length ? fromReal : fromPos);
+      // real dates and times win whenever we have them; positions are only for older answers
+      mine[i] = new Set(restored ? (restored[i] || []) : (own?.availability?.[i] || []));
     });
     const firstVisit = isOwnerOf(ev) && !own;
     if (firstVisit) { plan.config.locations.forEach((l, i) => mine[i] = new Set(l.proposed)); }
@@ -1377,6 +1376,15 @@ const PIN_SUFFIX = '::ensemble-pin';
   async function saveMine() {
     const availability = {}; Object.keys(mine).forEach(k => availability[k] = [...mine[k]].sort((a,b)=>a-b));
     const anchors = toAnchors(plan.config, mine);
+    // Times that don't fit the current grid aren't on screen, so they aren't in `mine`.
+    // Carry them through untouched, or saving would quietly delete them.
+    Object.keys(myAnchors || {}).forEach(k => {
+      const offGrid = (myAnchors[k] || []).filter(a => {
+        const [date, hour] = a.split('T');
+        return momentToSlot(plan.config, { date, hour: parseFloat(hour) }) === null;
+      });
+      if (offGrid.length) anchors[k] = [...new Set([...(anchors[k] || []), ...offGrid])];
+    });
     const { error } = await sb.from('responses').upsert({ event_id: eventId, user_id: user.id, name: profileName || 'Someone', availability, anchors, note: myNote, note_at: myNoteAt, updated_at: new Date().toISOString() }, { onConflict: 'event_id,user_id' });
     if (error) { $('#saveState').textContent = 'Not saved — ' + error.message; $('#saveState').classList.add('dirty'); }
     return error;
