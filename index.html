@@ -1076,9 +1076,11 @@ const PIN_SUFFIX = '::ensemble-pin';
     buildGrid($('#proposeGrid'), draft, null); setPaintMode(paintMode); paintSet($('#proposeGrid'), proposed[pLoc]); updateCreate();
   }
   $('#deleteEvent').onclick = async () => {
-    if (!plan) return;
+    if (!plan || $('#deleteEvent').disabled) return;
     if (!confirm(`Delete “${plan.title}” for everyone? This removes the event and all its answers permanently.`)) return;
+    $('#deleteEvent').disabled = true;
     const { error } = await sb.from('events').delete().eq('id', eventId);
+    $('#deleteEvent').disabled = false;
     if (error) return toast(error.message);
     editing = false; dirty = false; location.hash = ''; render(); toast('Event deleted');
   };
@@ -1896,9 +1898,12 @@ const PIN_SUFFIX = '::ensemble-pin';
   $('#manualAll').onclick = () => { if (!locs()[loc]) return; mSel[loc] = new Set(locs()[loc].proposed || []); paintSet($('#manualGrid'), mSel[loc]); };
   $('#manualClear').onclick = () => { mSel[loc].clear(); paintSet($('#manualGrid'), mSel[loc]); };
   $('#manualSave').onclick = () => saveManual();
+  let savingManual = false;
   async function saveManual() {
+    if (savingManual) return false;
     const name = $('#manualName').value.trim();
     if (!name) { toast('Give this entry a name so you know whose times these are'); return false; }
+    savingManual = true; $('#manualSave').disabled = true;
     const availability = {}; Object.keys(mSel).forEach(k => availability[k] = [...mSel[k]].sort((a,b)=>a-b));
     const list = manuals();
     const note = $('#manualNote').value.trim();
@@ -1907,6 +1912,7 @@ const PIN_SUFFIX = '::ensemble-pin';
     $('#manualState').textContent = 'Saving…';
     const { error } = await sb.from('events').update({ config: plan.config }).eq('id', eventId);
     $('#manualState').textContent = error ? 'Not saved — ' + error.message : 'Saved';
+    savingManual = false; $('#manualSave').disabled = false;
     if (!error) {
       // log it like a real response so it appears in the change history
       sb.from('revisions').insert({ event_id: eventId, user_id: null, name: name + ' (added by you)', availability, note }).then(() => {});
