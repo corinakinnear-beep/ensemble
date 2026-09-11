@@ -11,7 +11,7 @@
   :root{
     --paper:#FBFAF6; --ink:#17181F; --ink-2:#5B5D66; --line:#DEDCD3;
     --propose:#7ED39A; --you:#FFD24D;
-    --h0:#EEF1F8; --h1:#C5D0F2; --h2:#8FA4E8; --h3:#5470DD; --h4:#1E3FD6;
+    --h0:#EDEFF4; --h1:#A9BCEE; --h2:#7A94E4; --h3:#4C69DA; --h4:#1E3FD6;
     --radius:10px; --cell:26px; --timecol:64px;
     /* type scale */
     --fs-micro:12px; --fs-cap:14px; --fs-body:16px; --fs-lead:18px; --fs-h3:22px; --fs-h2:27px;
@@ -177,7 +177,8 @@
   .tabs button[aria-selected=true]{background:var(--ink);color:#fff}
   .tabs.loc button[aria-selected=true]{background:var(--h4)}
   .closed{display:inline-block;background:#F3E4E4;color:#7A2E2E;border-radius:999px;padding:5px 12px;font-size:var(--fs-cap)}
-  .live{display:inline-flex;align-items:center;gap:6px;font-size:var(--fs-cap);color:var(--ink-2)}
+  .live{display:inline-flex;align-items:center;gap:6px;font-size:var(--fs-cap);color:var(--ink-2);cursor:pointer;border:1px solid var(--line);border-radius:999px;padding:5px 12px;background:#fff}
+  .live:hover{color:var(--ink)}
   .live i{width:8px;height:8px;border-radius:50%;background:#3BB273;display:inline-block}
 
   .layout{display:block}
@@ -196,12 +197,13 @@
   table.grid td.q15{height:calc(var(--cell) * .6)}
   table.grid td.dayslot{height:calc(var(--cell) * 2)}
   table.grid td.on{background:var(--you);box-shadow:none}
-  #youGrid td.offered:not(.on),#manualGrid td.offered:not(.on){background:#E4F6EA;box-shadow:inset 0 0 0 2px var(--propose)}
   .propose table.grid td.on{background:var(--propose);box-shadow:none}
   table.grid td.na{background:repeating-linear-gradient(135deg,transparent,transparent 4px,rgba(91,93,102,.11) 4px,rgba(91,93,102,.11) 5px);cursor:default;box-shadow:none;opacity:.65}
   table.grid td.l1{background:var(--h1)} table.grid td.l2{background:var(--h2)}
   table.grid td.l3{background:var(--h3)} table.grid td.l4{background:var(--h4)}
-  .heat table.grid td{cursor:default}
+  .heat table.grid td{cursor:default;text-align:center;font-size:var(--fs-cap);font-weight:600;color:var(--ink-2);line-height:var(--cell)}
+  .heat table.grid td.l2,.heat table.grid td.l3,.heat table.grid td.l4{color:#fff}
+  .heat table.grid td.q15{line-height:calc(var(--cell) * .6);font-size:11px}
   .heat table.grid td.sel{outline:2px solid var(--ink)}
   .legend{font-size:var(--fs-cap);color:var(--ink-2);margin-top:12px;line-height:1.7}
   .legend i{display:inline-block;width:16px;height:13px;border-radius:3px;vertical-align:-1px;margin:0 3px}
@@ -494,7 +496,7 @@
           <p class="qf-title" style="margin-bottom:10px">Choose location</p>
           <div class="tabs loc" id="locTabs" role="tablist"></div>
         </div>
-        <p class="legend" style="margin:0 0 14px"><i style="background:var(--propose)"></i> = opened by the coordinator. <i style="background:var(--you)"></i> = you can make it here. Hatched slots weren&rsquo;t proposed.</p>
+        <p class="legend" style="margin:0 0 14px"><i style="background:var(--you)"></i> = you can make it here. Hatched slots weren&rsquo;t proposed.</p>
         <div class="gridwrap" id="youGrid"></div>
         <div class="quickfill">
           <p class="qf-title">Quick fill options</p>
@@ -737,10 +739,7 @@ const PIN_SUFFIX = '::ensemble-pin';
     for (let k = 0; k < n; k++) {
       const h = cfg.s + k*cfg.g/60;
       html += `<tr><th class="time">${cfg.g >= 1440 ? 'All day' : (h % 1 === 0 ? fmtHour(h) : '')}</th>`;
-      cfg.d.forEach((_, day) => {
-        const idx = day*n + k, offered = proposed ? proposed.has(idx) : false, na = proposed && !offered;
-        html += `<td class="${cls}${offered ? ' offered' : ''}${na ? ' na' : ''}" data-i="${idx}" data-day="${day}"></td>`;
-      });
+      cfg.d.forEach((_, day) => { const idx = day*n + k; const na = proposed && !proposed.has(idx); html += `<td class="${cls}${na ? ' na' : ''}" data-i="${idx}" data-day="${day}"></td>`; });
       html += '</tr>';
     }
     if (cfg.g < 1440) html += `<tr><th class="time">${fmtHour(cfg.e)}</th></tr>`;
@@ -856,12 +855,13 @@ const PIN_SUFFIX = '::ensemble-pin';
   let eventId = null, plan = null, responses = [], channel = null;
   let showAccount = false, justCreated = false, curTab = 'group', loc = 0, mine = {}, myNote = '', myNoteAt = null, dirty = false, editing = false, creating = false, isOwner = false;
   let selected = null; // Set of user_ids being viewed, null = everyone
+  const stopPolling = () => { clearInterval(pollTimer); pollTimer = null; };
   const route = () => { const m = location.hash.match(/^#e\/([0-9a-f-]{36})/); eventId = m ? m[1] : null; };
 
   async function render() {
     route();
     const show = id => ['#signin','#dash','#home','#plan'].forEach(s => $(s).classList.toggle('hidden', s !== id));
-    if (!eventId || !user) { $('#savebar').classList.remove('on'); document.body.classList.remove('hasbar'); }
+    if (!eventId || !user) { $('#savebar').classList.remove('on'); document.body.classList.remove('hasbar'); stopPolling(); }
     if (!user) { $('#signinTitle').textContent = eventId ? 'Sign in to mark your availability' : 'Sign in to create an event'; show('#signin'); $('#paintbar').classList.remove('avail'); return; }
     if (editing) { show('#home'); $('#paintbar').classList.add('avail'); return; }
     if (creating) { show('#home'); $('#paintbar').classList.add('avail'); startCreate(); return; }
@@ -1135,18 +1135,59 @@ const PIN_SUFFIX = '::ensemble-pin';
     }, 50);
     subscribe();
   }
+  let liveOk = false, pollTimer = null, refreshing = false;
+
+  // Pull the latest answers without disturbing anything the person is part-way through editing.
+  async function refreshData(reason) {
+    if (!plan || !eventId || refreshing) return;
+    refreshing = true;
+    try {
+      const [{ data: ev }, { data: rs }] = await Promise.all([
+        sb.from('events').select('*').eq('id', eventId).single(),
+        sb.from('responses').select('*').eq('event_id', eventId).order('name')
+      ]);
+      if (!ev) return;
+      const gridChanged = JSON.stringify(ev.config?.d) !== JSON.stringify(plan.config?.d)
+        || JSON.stringify(ev.config?.locations?.map(l => l.proposed)) !== JSON.stringify(plan.config?.locations?.map(l => l.proposed));
+      plan = ev;
+      responses = rs || [];
+      renderLocTabs(); renderMeta();
+      // never redraw the grid under someone mid-edit — it would wipe their unsaved marks
+      if (gridChanged && !dirty) renderGrids(); else paintHeat();
+      markFresh();
+      localStorage.setItem(lastSeenKey(eventId), new Date().toISOString());
+    } catch (e) { /* offline or asleep — the next tick will try again */ }
+    finally { refreshing = false; }
+  }
+  function markFresh() {
+    const el = $('#live');
+    if (!el) return;
+    el.style.opacity = 1;
+    el.innerHTML = `<i></i>Updated ${new Date().toLocaleTimeString(undefined,{hour:'numeric',minute:'2-digit'})}`;
+    el.title = 'Tap to refresh now';
+  }
   function subscribe() {
     if (channel) sb.removeChannel(channel);
     channel = sb.channel('event-' + eventId)
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'responses', filter: 'event_id=eq.' + eventId }, async () => {
-        const before = new Map(responses.map(r => [r.user_id, r.updated_at]));
-        const { data } = await sb.from('responses').select('*').eq('event_id', eventId).order('name');
-        responses = data || []; paintHeat();
-        localStorage.setItem(lastSeenKey(eventId), new Date().toISOString());
-      })
-      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'events', filter: 'id=eq.' + eventId }, p => { plan = p.new; renderLocTabs(); renderMeta(); renderGrids(); })
-      .subscribe(status => $('#live').style.opacity = status === 'SUBSCRIBED' ? 1 : .4);
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'responses', filter: 'event_id=eq.' + eventId }, () => refreshData('realtime'))
+      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'events', filter: 'id=eq.' + eventId }, () => refreshData('event-change'))
+      .subscribe(status => {
+        liveOk = status === 'SUBSCRIBED';
+        if (!liveOk) $('#live').style.opacity = .4;
+      });
+
+    // belt and braces: realtime sockets die quietly when a phone sleeps
+    clearInterval(pollTimer);
+    pollTimer = setInterval(() => { if (!document.hidden) refreshData('poll'); }, 45000);
   }
+  document.addEventListener('visibilitychange', () => {
+    if (document.hidden || !plan) return;
+    refreshData('visible');
+    if (!liveOk) subscribe();   // reconnect a socket that died while backgrounded
+  });
+  window.addEventListener('focus', () => { if (plan) refreshData('focus'); });
+  window.addEventListener('online', () => { if (plan) { refreshData('online'); subscribe(); } });
+  document.addEventListener('click', e => { if (e.target.closest('#live')) refreshData('manual'); });
   const locs = () => plan.config.locations;
   const manuals = () => (plan.config.manual ||= []);
   const manualRows = () => manuals().map(m => ({ user_id: 'm:' + m.id, name: m.name, availability: m.availability || {}, note: m.note || '', note_at: m.updated_at, updated_at: m.updated_at, manual: true }));
@@ -1272,6 +1313,7 @@ const PIN_SUFFIX = '::ensemble-pin';
       const c = cur.counts[td.dataset.i] || 0;
       td.classList.remove('l1','l2','l3','l4'); if (c) td.classList.add('l' + Math.max(1, Math.ceil(c / max * 4)));
       td.dataset.c = c; td.dataset.names = (cur.names[td.dataset.i] || []).join(', ');
+      td.textContent = c ? c : '';
     });
     // Merge consecutive equally-attended slots into ranges (9–10, 9–12 …)
     const n = spd(plan.config);
