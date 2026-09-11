@@ -94,7 +94,8 @@
   .pitch .lede{margin-bottom:28px}
   .sell{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:16px}
   .sellcard{background:#fff;border:1px solid var(--line);border-radius:14px;padding:20px 22px}
-  .sellcard h4{font-size:var(--fs-body);font-weight:700;margin:0 0 8px;letter-spacing:-.01em}
+  .sellcard h4{font-size:var(--fs-body);font-weight:700;margin:0 0 8px;letter-spacing:-.01em;display:flex;align-items:baseline;gap:9px}
+  .sellcard .sellicon{font-size:19px;line-height:1;flex:none}
   .sellcard p{margin:0;font-size:var(--fs-cap);color:var(--ink-2);line-height:1.55}
   .pitch .closer{margin:26px 0 0;font-size:var(--fs-body);color:var(--ink-2)}
 
@@ -312,27 +313,27 @@
 
       <div class="sell">
         <div class="sellcard">
-          <h4>Propose, don&rsquo;t negotiate</h4>
+          <h4><span class="sellicon">🗓️</span>Propose, don&rsquo;t negotiate</h4>
           <p>Paint the times that could work, add up to five possible locations, and send one link. Everyone marks what works for them on the same grid.</p>
         </div>
         <div class="sellcard">
-          <h4>See exactly who can come</h4>
+          <h4><span class="sellicon">👀</span>See exactly who can come</h4>
           <p>A heat map shows where availability stacks up. Tap any slot for the names &mdash; who&rsquo;s in, who isn&rsquo;t. Narrow it to two people to find just their overlap.</p>
         </div>
         <div class="sellcard">
-          <h4>Two places, fairly compared</h4>
+          <h4><span class="sellicon">📍</span>Two places, fairly compared</h4>
           <p>Each location gets its own calendar, so someone coming from across town can say yes to one and no to the other. You&rsquo;ll see which place wins.</p>
         </div>
         <div class="sellcard">
-          <h4>No account anyone will forget</h4>
+          <h4><span class="sellicon">🔑</span>No account anyone will forget</h4>
           <p>A name and a four-digit PIN. No email required, nothing to verify, no app to install. Works the same on a phone as on a laptop.</p>
         </div>
         <div class="sellcard">
-          <h4>Answers stay changeable</h4>
+          <h4><span class="sellicon">✏️</span>Answers stay changeable</h4>
           <p>Plans shift. Anyone can sign back in and update their times, and you can enter availability yourself for a space or someone who texted you theirs.</p>
         </div>
         <div class="sellcard">
-          <h4>Free, and quiet</h4>
+          <h4><span class="sellicon">🤫</span>Free, and quiet</h4>
           <p>No cost, no ads, no notifications you didn&rsquo;t ask for. Switch on an email alert only if you want to hear the moment someone updates.</p>
         </div>
       </div>
@@ -894,7 +895,8 @@ const PIN_SUFFIX = '::ensemble-pin';
     $('#eventsBlock').classList.toggle('hidden', showAccount);
     window.scrollTo(0, 0);
     $('#evlist').innerHTML = '<p class="empty">Loading…</p>';
-    const { data: mineR } = await sb.from('responses').select('event_id,updated_at,dismissed').eq('user_id', user.id);
+    const { data: mineR, error: dashErr } = await sb.from('responses').select('event_id,updated_at,dismissed').eq('user_id', user.id);
+    if (dashErr) { $('#evlist').innerHTML = '<p class="cap">Couldn\'t load your events — check your connection and try again.</p>'; return; }
     const ids = (mineR || []).filter(r => !r.dismissed).map(r => r.event_id);
     const { data: owned } = await sb.from('events').select('*').eq('owner', user.id);
     let invited = [];
@@ -949,7 +951,7 @@ const PIN_SUFFIX = '::ensemble-pin';
     const { error } = row.host
       ? await sb.from('events').delete().eq('id', id)
       : await sb.from('responses').update({ dismissed: true }).eq('event_id', id).eq('user_id', user.id);
-    if (error) return toast(error.message);
+    if (error) return toast("Couldn't remove that: " + error.message);
     toast(row.host ? 'Event deleted' : 'Removed from your list');
     loadDash();
   }
@@ -957,11 +959,15 @@ const PIN_SUFFIX = '::ensemble-pin';
     const past = dashRows.filter(r => r.past);
     if (!past.length) return;
     if (!confirm(`Remove ${past.length} past event${past.length > 1 ? 's' : ''}? Ones you host will be deleted for everyone.`)) return;
+    let failed = 0;
     for (const r of past) {
-      if (r.host) await sb.from('events').delete().eq('id', r.ev.id);
-      else await sb.from('responses').update({ dismissed: true }).eq('event_id', r.ev.id).eq('user_id', user.id);
+      const { error } = r.host
+        ? await sb.from('events').delete().eq('id', r.ev.id)
+        : await sb.from('responses').update({ dismissed: true }).eq('event_id', r.ev.id).eq('user_id', user.id);
+      if (error) failed++;
     }
-    toast('Past events removed'); loadDash();
+    toast(failed ? `${past.length - failed} removed, ${failed} couldn't be` : 'Past events removed');
+    loadDash();
   };
   $('#dashNew').onclick = () => { creating = true; render(); };
   $('#acctBack').onclick = () => { showAccount = false; render(); };
@@ -1167,8 +1173,9 @@ const PIN_SUFFIX = '::ensemble-pin';
     if (error || !ev) { $('#plan').innerHTML = '<p class="empty">That event link doesn\'t exist any more.</p>'; return; }
     plan = ev; if (loc >= plan.config.locations.length) loc = 0;
     const isOwnerOf = e => e.owner === user.id;
-    const { data: rs } = await sb.from('responses').select('*').eq('event_id', eventId).order('name');
-    responses = rs || [];
+    const { data: rs, error: rsErr } = await sb.from('responses').select('*').eq('event_id', eventId).order('name');
+    if (rsErr) { toast("Couldn't load everyone's answers — check your connection"); }
+    responses = rsErr ? responses : (rs || []);
     const own = responses.find(r => r.user_id === user.id);
     mine = {};
     myAnchors = (own?.anchors && Object.keys(own.anchors).length) ? own.anchors : null;
@@ -1219,11 +1226,11 @@ const PIN_SUFFIX = '::ensemble-pin';
     if (curTab === 'manual' && typeof manualDirty === 'function' && manualDirty()) return;
     refreshing = true;
     try {
-      const [{ data: ev }, { data: rs }] = await Promise.all([
+      const [{ data: ev }, { data: rs, error: rsErr }] = await Promise.all([
         sb.from('events').select('*').eq('id', eventId).single(),
         sb.from('responses').select('*').eq('event_id', eventId).order('name')
       ]);
-      if (!ev) return;
+      if (!ev || rsErr) return;   // a hiccup shouldn't wipe what's already on screen
       const gridChanged = JSON.stringify(ev.config?.d) !== JSON.stringify(plan.config?.d)
         || JSON.stringify(ev.config?.locations?.map(l => l.proposed)) !== JSON.stringify(plan.config?.locations?.map(l => l.proposed));
       plan = ev;
