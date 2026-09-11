@@ -199,8 +199,8 @@
   table.grid td.on{background:var(--you);box-shadow:none}
   .propose table.grid td.on{background:var(--propose);box-shadow:none}
   table.grid td.na{background:repeating-linear-gradient(135deg,transparent,transparent 4px,rgba(91,93,102,.11) 4px,rgba(91,93,102,.11) 5px);cursor:default;box-shadow:none;opacity:.65}
-  /* you marked this, but the organiser has since withdrawn it */
-  table.grid td.na.on{opacity:1;background:repeating-linear-gradient(135deg,var(--you),var(--you) 5px,#E0B53A 5px,#E0B53A 7px);box-shadow:inset 0 0 0 2px #C8991A}
+  /* a time the organiser no longer offers: your answer is kept but not shown */
+  table.grid td.na.on{background:repeating-linear-gradient(135deg,transparent,transparent 4px,rgba(91,93,102,.11) 4px,rgba(91,93,102,.11) 5px);box-shadow:none;opacity:.65}
   table.grid td.l1{background:var(--h1)} table.grid td.l2{background:var(--h2)}
   table.grid td.l3{background:var(--h3)} table.grid td.l4{background:var(--h4)}
   .heat table.grid td{cursor:default;text-align:center;font-size:var(--fs-cap);font-weight:600;color:var(--ink-2);line-height:var(--cell)}
@@ -499,7 +499,6 @@
           <div class="tabs loc" id="locTabs" role="tablist"></div>
         </div>
         <p class="legend" style="margin:0 0 14px"><i style="background:var(--you)"></i> = you can make it here. Hatched slots weren&rsquo;t proposed.</p>
-        <p class="cap hidden" id="withdrawnNote" style="margin:0 0 14px;padding:10px 12px;background:#FFF8E6;border:1px solid #F2DA96;border-radius:10px"></p>
         <div class="gridwrap" id="youGrid"></div>
         <div class="quickfill">
           <p class="qf-title">Quick fill options</p>
@@ -1094,13 +1093,6 @@ const PIN_SUFFIX = '::ensemble-pin';
       const axisMoved = editBase.s !== config.s || editBase.e !== config.e
         || editBase.g !== config.g || editBase.d[0] !== config.d[0];
       const answered = responses.filter(r => Object.values(r.availability || {}).some(a => a.length)).length;
-      if (axisMoved && answered) {
-        const ok = confirm(
-          `${answered} ${answered === 1 ? 'person has' : 'people have'} already answered.\n\n` +
-          `You've changed the daily time range, the slot length, or the first day. Their saved times were recorded against the old grid, so some will no longer line up and may be dropped.\n\n` +
-          `Adding days to the end is always safe. Continue anyway?`);
-        if (!ok) { $('#createBtn').disabled = false; return; }
-      }
       if (axisMoved) {
         // keep the parts we're allowed to rewrite pointing at the same real times
         config.locations = config.locations.map((l, i) => ({
@@ -1115,7 +1107,24 @@ const PIN_SUFFIX = '::ensemble-pin';
       const { error } = await sb.from('events').update({ title, config }).eq('id', eventId);
       $('#createBtn').disabled = false;
       if (error) return toast('Could not save: ' + error.message);
-      editing = false; render(); toast('Event updated');
+
+      if (axisMoved) {
+        // Rebuild positions from each answer's real dates and times. Anything that
+        // doesn't fit the new grid stays recorded and returns if the grid grows again.
+        const n = config.g >= 1440 ? 1 : (config.e - config.s) * 60 / config.g;
+        const map = {};
+        config.d.forEach((date, day) => {
+          for (let k = 0; k < n; k++) {
+            const hour = config.s + k * config.g / 60;
+            map[date + 'T' + hour] = day * n + k;
+          }
+        });
+        const { error: rErr } = await sb.rpc('rebuild_event_slots', { p_event: eventId, p_map: map });
+        if (rErr) toast('Times saved, but answers could not be rebuilt: ' + rErr.message);
+        else toast(`Event updated — everyone's times kept their real dates and hours`);
+      }
+      editing = false; render();
+      if (!axisMoved) toast('Event updated');
     } else {
       const { data, error } = await sb.from('events').insert({ owner: user.id, title, config }).select('id').single();
       if (error) { toast('Could not create event: ' + error.message); $('#createBtn').disabled = false; return; }
@@ -1159,7 +1168,14 @@ const PIN_SUFFIX = '::ensemble-pin';
     const { data: rs } = await sb.from('responses').select('*').eq('event_id', eventId).order('name');
     responses = rs || [];
     const own = responses.find(r => r.user_id === user.id);
-    mine = {}; plan.config.locations.forEach((_, i) => mine[i] = new Set(own?.availability?.[i] || []));
+    mine = {};
+    const restored = own?.anchors ? fromAnchors(plan.config, own.anchors) : null;
+    plan.config.locations.forEach((_, i) => {
+      // prefer the real-time record; fall back to stored positions for older answers
+      const fromReal = restored ? (restored[i] || []) : null;
+      const fromPos = own?.availability?.[i] || [];
+      mine[i] = new Set(fromReal && fromReal.length >= fromPos.length ? fromReal : fromPos);
+    });
     const firstVisit = isOwnerOf(ev) && !own;
     if (firstVisit) { plan.config.locations.forEach((l, i) => mine[i] = new Set(l.proposed)); }
     myNote = own?.note || ''; myNoteAt = own?.note_at || null; $('#noteBox').value = myNote;
@@ -1279,14 +1295,7 @@ const PIN_SUFFIX = '::ensemble-pin';
     const pset = new Set(locs()[loc].proposed || []);
     buildGrid($('#youGrid'), plan.config, pset); buildGrid($('#groupGrid'), plan.config, pset);
     setPaintMode(paintMode);
-    const withdrawn = paintSet($('#youGrid'), mine[loc] ||= new Set());
-    const wn = $('#withdrawnNote');
-    if (wn) {
-      wn.classList.toggle('hidden', !withdrawn);
-      wn.innerHTML = withdrawn
-        ? `<b>${withdrawn} ${withdrawn === 1 ? 'time you marked is' : 'times you marked are'} no longer offered by the organiser</b> — shown striped below.`
-        : '';
-    }
+    paintSet($('#youGrid'), mine[loc] ||= new Set());
     paintHeat();
   }
   makePainter($('#youGrid'), () => mine[loc] ||= new Set(), () => { if (plan.closed) { toast('This event is closed to changes'); return false; } return true; });
@@ -1345,9 +1354,30 @@ const PIN_SUFFIX = '::ensemble-pin';
     e.returnValue = 'Are you sure you want to close this page without saving your changes?';
     return e.returnValue;
   });
+  // Slot positions shift when the grid changes; real dates and times never do.
+  // We save both, so an answer can always be rebuilt even if its position disappears.
+  const toAnchors = (cfg, byLoc) => {
+    const out = {};
+    Object.keys(byLoc).forEach(k => {
+      out[k] = [...byLoc[k]].map(i => slotToMoment(cfg, i)).filter(Boolean).map(mo => mo.date + 'T' + mo.hour);
+    });
+    return out;
+  };
+  const fromAnchors = (cfg, anchors) => {
+    const out = {};
+    Object.keys(anchors || {}).forEach(k => {
+      out[k] = (anchors[k] || []).map(a => {
+        const [date, hour] = a.split('T');
+        return momentToSlot(cfg, { date, hour: parseFloat(hour) });
+      }).filter(i => i !== null);
+    });
+    return out;
+  };
+
   async function saveMine() {
     const availability = {}; Object.keys(mine).forEach(k => availability[k] = [...mine[k]].sort((a,b)=>a-b));
-    const { error } = await sb.from('responses').upsert({ event_id: eventId, user_id: user.id, name: profileName || 'Someone', availability, note: myNote, note_at: myNoteAt, updated_at: new Date().toISOString() }, { onConflict: 'event_id,user_id' });
+    const anchors = toAnchors(plan.config, mine);
+    const { error } = await sb.from('responses').upsert({ event_id: eventId, user_id: user.id, name: profileName || 'Someone', availability, anchors, note: myNote, note_at: myNoteAt, updated_at: new Date().toISOString() }, { onConflict: 'event_id,user_id' });
     if (error) { $('#saveState').textContent = 'Not saved — ' + error.message; $('#saveState').classList.add('dirty'); }
     return error;
   }
@@ -1379,7 +1409,11 @@ const PIN_SUFFIX = '::ensemble-pin';
     const view = shown(), max = view.length || 1;
     const per = locs().map((l, li) => {
       const counts = {}, names = {};
-      view.forEach(r => (r.availability?.[li] || []).forEach(i => { counts[i] = (counts[i]||0)+1; (names[i] ||= []).push(r.name); }));
+      const offered = new Set(l.proposed || []);
+      view.forEach(r => (r.availability?.[li] || []).forEach(i => {
+        if (!offered.has(i)) return;          // withdrawn by the organiser: kept, but not counted
+        counts[i] = (counts[i]||0)+1; (names[i] ||= []).push(r.name);
+      }));
       return { counts, names };
     });
     const cur = per[loc] || { counts:{}, names:{} };
