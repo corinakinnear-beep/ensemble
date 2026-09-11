@@ -1055,9 +1055,11 @@ const PIN_SUFFIX = '::ensemble-pin';
     locCount = 2; renderLocFields(null); proposed = [new Set(), new Set()]; pLoc = 0;
     renderProposeTabs(); rebuildGridOnly();
   }
+  let editBase = null;
   function startEdit() {
     editing = true;
     const c = plan.config;
+    editBase = JSON.parse(JSON.stringify(c));
     $('#createIntro').classList.add('hidden'); $('#editIntro').classList.remove('hidden');
     $('#createBtn').textContent = 'Save changes'; $('#cancelEdit').classList.remove('hidden'); $('#dangerZone').classList.remove('hidden'); $('#addDaysSection').classList.remove('hidden');
     $('#title').value = plan.title;
@@ -1088,7 +1090,28 @@ const PIN_SUFFIX = '::ensemble-pin';
     const config = { ...draft, locations: names.map((name, i) => ({ name, proposed: [...(proposed[i] || [])].sort((a,b)=>a-b) })) };
     const title = $('#title').value.trim() || 'Untitled event';
     $('#createBtn').disabled = true;
-    if (editing) {
+    if (editing && editBase) {
+      const axisMoved = editBase.s !== config.s || editBase.e !== config.e
+        || editBase.g !== config.g || editBase.d[0] !== config.d[0];
+      const answered = responses.filter(r => Object.values(r.availability || {}).some(a => a.length)).length;
+      if (axisMoved && answered) {
+        const ok = confirm(
+          `${answered} ${answered === 1 ? 'person has' : 'people have'} already answered.\n\n` +
+          `You've changed the daily time range, the slot length, or the first day. Their saved times were recorded against the old grid, so some will no longer line up and may be dropped.\n\n` +
+          `Adding days to the end is always safe. Continue anyway?`);
+        if (!ok) { $('#createBtn').disabled = false; return; }
+      }
+      if (axisMoved) {
+        // keep the parts we're allowed to rewrite pointing at the same real times
+        config.locations = config.locations.map((l, i) => ({
+          ...l, proposed: remapSlots(editBase, config, [...(proposed[i] || [])])
+        }));
+        if (Array.isArray(config.manual)) config.manual = config.manual.map(m => {
+          const av = {};
+          Object.keys(m.availability || {}).forEach(k => { av[k] = remapSlots(editBase, config, m.availability[k]); });
+          return { ...m, availability: av };
+        });
+      }
       const { error } = await sb.from('events').update({ title, config }).eq('id', eventId);
       $('#createBtn').disabled = false;
       if (error) return toast('Could not save: ' + error.message);
@@ -1100,6 +1123,28 @@ const PIN_SUFFIX = '::ensemble-pin';
       toast('Event created — copy the invite link to share it');
     }
   };
+
+  // A saved answer is a position on the grid, so moving the grid's axis silently
+  // changes what every answer means. These let us translate between the two.
+  const slotToMoment = (cfg, idx) => {
+    const n = cfg.g >= 1440 ? 1 : (cfg.e - cfg.s) * 60 / cfg.g;
+    const day = Math.floor(idx / n), k = idx % n;
+    if (!cfg.d[day]) return null;
+    return { date: cfg.d[day], hour: cfg.s + k * cfg.g / 60 };
+  };
+  const momentToSlot = (cfg, mo) => {
+    if (!mo) return null;
+    const n = cfg.g >= 1440 ? 1 : (cfg.e - cfg.s) * 60 / cfg.g;
+    const day = cfg.d.indexOf(mo.date);
+    if (day < 0) return null;
+    if (cfg.g >= 1440) return day;
+    const k = (mo.hour - cfg.s) * 60 / cfg.g;
+    if (k < 0 || k >= n || k % 1 !== 0) return null;   // that time no longer exists on the grid
+    return day * n + k;
+  };
+  const remapSlots = (oldCfg, newCfg, idxs) =>
+    [...new Set((idxs || []).map(i => momentToSlot(newCfg, slotToMoment(oldCfg, i))).filter(i => i !== null))]
+      .sort((a, b) => a - b);
 
   /* ---------- event ---------- */
   let loadSeq = 0;
@@ -1248,6 +1293,7 @@ const PIN_SUFFIX = '::ensemble-pin';
   $('#youGrid').addEventListener('painted', markDirty);
   $('#copyMine').onclick = () => {
     const o = +$('#copyMineTo').value;
+    if (!locs()[o] || !locs()[loc]) return toast('That location has changed — reload to see the latest');
     mine[o] = new Set([...mine[loc]].filter(i => locs()[o].proposed.includes(i)));
     markDirty(); toast(`Copied to ${locs()[o].name} — only times proposed there`);
   };
@@ -1395,6 +1441,7 @@ const PIN_SUFFIX = '::ensemble-pin';
     const i = +td.dataset.i, view = shown();
     const free = view.filter(r => (r.availability?.[loc] || []).includes(i)).map(r => r.name);
     const busy = view.filter(r => !(r.availability?.[loc] || []).includes(i)).map(r => r.name);
+    if (!locs()[loc]) return;
     $('#who').innerHTML = `<b>${slotLabel(plan.config, i)} · ${esc(locs()[loc].name)}</b>`
       + (free.length ? `<ul class="free">${free.map(n => `<li>${esc(n)}</li>`).join('')}</ul>` : '<span class="none">Nobody here yet.</span>')
       + (busy.length ? `<p class="miss">Can't make it: ${esc(busy.join(', '))}</p>` : '');
@@ -1800,10 +1847,11 @@ const PIN_SUFFIX = '::ensemble-pin';
   }
   $('#manualCopy').onclick = () => {
     const o = +$('#manualCopyTo').value;
+    if (!locs()[o] || !locs()[loc]) return toast('That location has changed — reload to see the latest');
     mSel[o] = new Set([...mSel[loc]].filter(i => locs()[o].proposed.includes(i)));
     toast(`Copied to ${locs()[o].name} — only times proposed there`);
   };
-  $('#manualAll').onclick = () => { mSel[loc] = new Set(locs()[loc].proposed); paintSet($('#manualGrid'), mSel[loc]); };
+  $('#manualAll').onclick = () => { if (!locs()[loc]) return; mSel[loc] = new Set(locs()[loc].proposed || []); paintSet($('#manualGrid'), mSel[loc]); };
   $('#manualClear').onclick = () => { mSel[loc].clear(); paintSet($('#manualGrid'), mSel[loc]); };
   $('#manualSave').onclick = () => saveManual();
   async function saveManual() {
