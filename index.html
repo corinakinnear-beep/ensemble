@@ -492,7 +492,7 @@
 
       <section class="section">
         <div class="shead"><h3>Your times</h3></div>
-        <div id="youLocSection" style="margin-bottom:18px">
+        <div class="locpick" id="youLocSection" style="margin-bottom:18px">
           <p class="qf-title" style="margin-bottom:10px">Choose location</p>
           <div class="tabs loc" id="locTabs" role="tablist"></div>
         </div>
@@ -528,7 +528,7 @@
     <div id="groupPane">
       <h3 class="bigtitle">Everyone&rsquo;s answers</h3>
 
-      <section class="section">
+      <section class="section locpick">
         <div class="shead"><h3>Choose location</h3></div>
         <div class="tabs loc" id="locTabsG" role="tablist"></div>
       </section>
@@ -637,7 +637,7 @@
 
       <section class="section">
         <div class="shead"><h3>Their times</h3></div>
-        <div style="margin-bottom:18px">
+        <div class="locpick" style="margin-bottom:18px">
           <p class="qf-title" style="margin-bottom:10px">Choose location</p>
           <div class="tabs loc" id="locTabsM" role="tablist"></div>
         </div>
@@ -1155,6 +1155,8 @@ const PIN_SUFFIX = '::ensemble-pin';
         || JSON.stringify(ev.config?.locations?.map(l => l.proposed)) !== JSON.stringify(plan.config?.locations?.map(l => l.proposed));
       plan = ev;
       responses = rs || [];
+      // a location may have been removed since this page loaded
+      if (loc >= (plan.config.locations || []).length) { loc = 0; renderGrids(); }
       renderLocTabs(); renderMeta();
       // never redraw the grid under someone mid-edit — it would wipe their unsaved marks
       if (gridChanged && !dirty) renderGrids(); else paintHeat();
@@ -1201,7 +1203,7 @@ const PIN_SUFFIX = '::ensemble-pin';
     ['#locTabs','#locTabsG','#locTabsM'].forEach(sel => {
       const el = $(sel); if (!el) return;
       el.innerHTML = html;
-      el.closest('.section')?.classList.toggle('hidden', locs().length < 2);
+      el.closest('.locpick')?.classList.toggle('hidden', locs().length < 2);
       el.querySelectorAll('button').forEach(b => b.onclick = () => { loc = +b.dataset.i; renderLocTabs(); renderGrids(); if (!$('#manualPane').classList.contains('hidden')) renderManualGrid(); });
     });
     const multi = locs().length > 1;
@@ -1216,7 +1218,9 @@ const PIN_SUFFIX = '::ensemble-pin';
     $('#closeBtn').textContent = plan.closed ? 'Reopen event' : 'Close event';
   }
   function renderGrids() {
-    const pset = new Set(locs()[loc].proposed);
+    if (!plan || !locs().length) return;
+    if (loc >= locs().length) loc = 0;
+    const pset = new Set(locs()[loc].proposed || []);
     buildGrid($('#youGrid'), plan.config, pset); buildGrid($('#groupGrid'), plan.config, pset);
     setPaintMode(paintMode); paintSet($('#youGrid'), mine[loc] ||= new Set()); paintHeat();
   }
@@ -1729,7 +1733,9 @@ const PIN_SUFFIX = '::ensemble-pin';
     $('#manualDiscard').classList.toggle('hidden', !mEntry);
   }
   function renderManualGrid() {
-    buildGrid($('#manualGrid'), plan.config, new Set(locs()[loc].proposed));
+    if (!plan || !locs().length) return;
+    if (loc >= locs().length) loc = 0;
+    buildGrid($('#manualGrid'), plan.config, new Set(locs()[loc].proposed || []));
     setPaintMode(paintMode); paintSet($('#manualGrid'), mSel[loc] ||= new Set());
   }
   makePainter($('#manualGrid'), () => mSel[loc] ||= new Set(), () => true);
