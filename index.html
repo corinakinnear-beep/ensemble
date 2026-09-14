@@ -12,7 +12,7 @@
     --paper:#FBFAF6; --ink:#17181F; --ink-2:#5B5D66; --line:#DEDCD3;
     --propose:#7ED39A; --you:#FFD24D;
     --h0:#EDEFF4; --h1:#A9BCEE; --h2:#7A94E4; --h3:#4C69DA; --h4:#1E3FD6;
-    --radius:10px; --cell:26px; --timecol:64px;
+    --radius:10px; --cell:30px; --timecol:64px;
     /* type scale */
     --fs-micro:12px; --fs-cap:14px; --fs-body:16px; --fs-lead:18px; --fs-h3:22px; --fs-h2:27px;
   }
@@ -204,7 +204,8 @@
   table.grid td.na.on{background:repeating-linear-gradient(135deg,transparent,transparent 4px,rgba(91,93,102,.11) 4px,rgba(91,93,102,.11) 5px);box-shadow:none;opacity:.65}
   table.grid td.l1{background:var(--h1)} table.grid td.l2{background:var(--h2)}
   table.grid td.l3{background:var(--h3)} table.grid td.l4{background:var(--h4)}
-  .heat table.grid td{cursor:default;text-align:center;font-size:var(--fs-cap);font-weight:600;color:var(--ink-2);line-height:var(--cell)}
+  .heat table.grid td{cursor:default;text-align:center;font-size:var(--fs-cap);font-weight:700;color:var(--ink-2);line-height:var(--cell);font-variant-numeric:tabular-nums}
+  .heat table.grid td.l1{color:#2B3A6B}
   .heat table.grid td.l2,.heat table.grid td.l3,.heat table.grid td.l4{color:#fff}
   .heat table.grid td.q15{line-height:calc(var(--cell) * .6);font-size:11px}
   .heat table.grid td.sel{outline:2px solid var(--ink)}
